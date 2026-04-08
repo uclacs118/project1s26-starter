@@ -1,0 +1,23 @@
+# Build artifacts
+proxy
+*.o
+*.a
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test outputs
+results/
+*.out
+
+# Python
+__pycache__/
+*.pyc

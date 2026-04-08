@@ -1,0 +1,84 @@
+#!/bin/bash
+
+NAME="ghcr.io/uclacs118/project1s26"
+
+function show_help() {
+    echo "Usage: $0 [command]"
+    echo "Commands:"
+    echo "  run          Run the local autograder."
+    echo "  interactive  Start an interactive bash session in the autograder."
+    echo "  zip          Prepare a ZIP file for submission."
+    echo "  clean        Clean up Docker artifacts."
+    echo "  help         Show this help message."
+}
+
+function ensure_container() {
+    if ! command -v docker >/dev/null 2>&1; then
+        echo "Error: Docker is not installed." >&2
+        exit 1
+    fi
+
+    if ! docker info >/dev/null 2>&1; then
+        echo "Error: Cannot connect to Docker daemon." >&2
+        exit 1
+    fi
+
+    echo "Pulling latest image..."
+    docker pull "$NAME"
+
+    CONTAINER_ID=$(docker ps -a -q --filter "name=project1_instance")
+    if [ -z "$CONTAINER_ID" ]; then
+        CONTAINER_ID=$(docker create --name project1_instance -v "$(pwd):/autograder/submission:ro" -v "$(pwd)/results:/autograder/results" --entrypoint tail "$NAME" -f /dev/null)
+    fi
+
+    if [ -z "$(docker ps -q --filter "name=project1_instance" --filter "status=running")" ]; then
+        docker start "$CONTAINER_ID"
+    fi
+}
+
+function run_autograder() {
+    ensure_container
+    echo "Running autograder..."
+    docker exec "$CONTAINER_ID" bash -c "/autograder/run_autograder 2> /dev/null && cat /autograder/results/results.json"
+}
+
+function interactive_session() {
+    ensure_container
+    echo "Starting interactive session..."
+    docker exec -it "$CONTAINER_ID" bash -c "cd /autograder && exec bash"
+}
+
+function clean_project() {
+    echo "Cleaning up..."
+    docker rm -f project1_instance 2>/dev/null
+    echo "Done."
+}
+
+if [ $# -lt 1 ]; then
+    show_help
+    exit 1
+fi
+
+case "$1" in
+    run)
+        run_autograder
+        ;;
+    interactive)
+        interactive_session
+        ;;
+    clean)
+        clean_project
+        ;;
+    zip)
+        rm -f submission.zip
+        zip -r submission.zip src/* Makefile -x "*.git*"
+        ;;
+    help)
+        show_help
+        ;;
+    *)
+        echo "Unknown command: $1"
+        show_help
+        exit 1
+        ;;
+esac
