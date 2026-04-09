@@ -41,21 +41,67 @@ const char *get_mime_type(const char *path) {
 }
 
 /**
- * Send an HTTP error response
+ * Send HTTP response headers
+ */
+void send_response_headers(int client_fd, int status_code, const char *status_msg, const char *content_type, long content_length) {
+    char header[BUFFER_SIZE];
+    int header_len = snprintf(header, sizeof(header),
+        "HTTP/1.1 %d %s\r\n"
+        "Content-Type: %s\r\n"
+        "Content-Length: %ld\r\n"
+        "Connection: close\r\n"
+        "\r\n",
+        status_code,
+        status_msg,
+        content_type,
+        content_length);
+
+    send(client_fd, header, header_len, 0)
+}
+
+/**
+ * Send an HTTP error response.
  */
 void send_error(int client_fd, int status_code, const char *status_msg, const char *body) {
-    char response[BUFFER_SIZE];
     int body_len = strlen(body);
-    int response_len = snprintf(response, sizeof(response),
-        "HTTP/1.1 %d %s\r\n"
-        "Content-Type: text/plain\r\n"
-        "Content-Length: %d\r\n"
-        "Connection: close\r\n"
-        "\r\n"
-        "%s",
-        status_code, status_msg, body_len, body);
-    
-    send(client_fd, response, response_len, 0);
+    send_response_headers(client_fd, status_code, status_msg, "text/plain", body_len);
+    send(client_fd, body, body_len, 0);
+}
+
+/*
+ * Connect to the backend server.
+ * Returns a connected socket fd on success, or -1 on failure.
+ */
+int connect_backend(const char *remote_host, int remote_port) {
+    int remote_fd;
+    struct sockaddr_in remote_addr;
+
+    /* Create socket to backend */
+    remote_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (remote_fd < 0) {
+        perror("socket failed");
+        return -1;
+    }
+
+    /* Setup remote address */
+    memset(&remote_addr, 0, sizeof(remote_addr));
+    remote_addr.sin_family = AF_INET;
+    remote_addr.sin_port = htons(remote_port);
+
+    if (inet_pton(AF_INET, remote_host, &remote_addr.sin_addr) <= 0) {
+        fprintf(stderr, "Invalid remote IPv4 address: %s\n", remote_host);
+        close(remote_fd);
+        return -1;
+    }
+
+    /* Connect to backend */
+    if (connect(remote_fd, (struct sockaddr *)&remote_addr, sizeof(remote_addr)) < 0) {
+        perror("connect to backend failed");
+        close(remote_fd);
+        return -1;
+    }
+
+    return remote_fd;
 }
 
 /**
