@@ -26,14 +26,13 @@ function ensure_container() {
     echo "Pulling latest image..."
     docker pull "$NAME"
 
-    CONTAINER_ID=$(docker ps -a -q --filter "name=project1_instance")
-    if [ -z "$CONTAINER_ID" ]; then
-        CONTAINER_ID=$(docker create --name project1_instance -v "$(pwd):/autograder/submission:ro" -v "$(pwd)/results:/autograder/results" --entrypoint tail "$NAME" -f /dev/null)
-    fi
+    # Remove existing container if it exists to ensure we use the latest image
+    docker rm -f project1_instance 2>/dev/null
 
-    if [ -z "$(docker ps -q --filter "name=project1_instance" --filter "status=running")" ]; then
-        docker start "$CONTAINER_ID"
-    fi
+    # Create new container with latest image
+    CONTAINER_ID=$(docker create --name project1_instance -v "$(pwd):/autograder/submission:ro" -v "$(pwd)/results:/autograder/results" --entrypoint tail "$NAME" -f /dev/null)
+
+    docker start "$CONTAINER_ID"
 }
 
 function run_autograder() {
