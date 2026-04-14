@@ -56,7 +56,7 @@ void send_response_headers(int client_fd, int status_code, const char *status_ms
         content_type,
         content_length);
 
-    send(client_fd, header, header_len, 0)
+    send(client_fd, header, header_len, 0);
 }
 
 /**
